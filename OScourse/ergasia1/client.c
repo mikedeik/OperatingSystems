@@ -5,30 +5,31 @@
 #include <sys/wait.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <fcntl.h>
+#include <semaphore.h>
 #include "defines.h"
 
 int main(int argc, char *argv[])
 {   
 
-
+    printf("this is the client running \n");
     //checking arguments
-    if (argc<5)
+    if (argc<4)
     {
         perror("error in arguments \n");
         return -1;
     }
     
-    int mem_id,sem_id err,lineNo,requests;
+    int mem_id,err,lineNo,requests;
     shared_mem *shmem;
 
     mem_id = atoi(argv[1]);
-    sem_id = atoi(argv[2]);
-    lineNo = atoi(argv[3]);
-    requests = atoi(argv[4]);
+    lineNo = atoi(argv[2]);
+    requests = atoi(argv[3]);
 
 
   
-    printf(">> The Shared Segment Id is: %d\n", id);
+    printf(">> The Shared Segment Id is: %d\n", mem_id);
 
 	/* Attach the memory segment */
 	shmem = shmat(mem_id, NULL, 0);
@@ -38,8 +39,22 @@ int main(int argc, char *argv[])
 		printf("Just Attached Shared Memory \n");
 	}
 
+    
+
     // Attach semaphore
-    sem_t *sem_req = sem_open(SEM_REQUEST, O_RDWR);
+    sem_t *sem_req = sem_open(SEM_REQUEST,O_RDWR);
+    if (sem_req == SEM_FAILED) {
+        perror("sem_open(3) failed");
+        exit(EXIT_FAILURE);
+    }
+
+    sem_t *sem_proc = sem_open(SEM_PROCESS,O_RDWR);
+    if (sem_proc == SEM_FAILED) {
+        perror("sem_open(3) failed");
+        exit(EXIT_FAILURE);
+    }
+
+    sem_t *sem_try = sem_open(SEM_TRY,O_RDWR);
     if (sem_req == SEM_FAILED) {
         perror("sem_open(3) failed");
         exit(EXIT_FAILURE);
@@ -50,15 +65,42 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < requests; i++)
     {
+
+
+
+        shmem->lineNo = i+3;
+        printf("PID %d requesting line %d \n",getpid(), shmem->lineNo );
+
+
+        if (sem_post(sem_proc)<0)
+        {
+            perror("sem_post(3) failed on child");
+            continue;
+        }
+
+        
+
         if (sem_wait(sem_req) < 0) {
             perror("sem_wait(3) failed on child");
             continue;
         }
+        printf("PID %d ,printing line %d from shared mem : %s \n",getpid(), shmem->lineNo , shmem->line);
         
-
-        shmem->lineNo = i % lineNo + 1;
+        sem_wait(sem_proc);
+        sem_post(sem_try);
+        
     }
     
+    //close semaphore
+    if (sem_close(sem_req) < 0)
+        perror("sem_close(3) failed");
+
+    if (sem_close(sem_proc) < 0)
+        perror("sem_close(3) failed");
+
+    
+    if (sem_close(sem_try) < 0)
+        perror("sem_close(3) failed");
 
 
 
