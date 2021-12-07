@@ -53,9 +53,8 @@ int main(int argc, char *argv[])
         perror("sem_open(3) failed");
         exit(EXIT_FAILURE);
     }
-
-    sem_t *sem_try = sem_open(SEM_TRY,O_RDWR);
-    if (sem_req == SEM_FAILED) {
+    sem_t *sem_clients = sem_open(SEM_CLIENTS,O_RDWR);
+    if (sem_clients == SEM_FAILED) {
         perror("sem_open(3) failed");
         exit(EXIT_FAILURE);
     }
@@ -67,7 +66,12 @@ int main(int argc, char *argv[])
     {
 
 
-
+        if (sem_wait(sem_clients)< 0 )
+        {
+            perror("sem_post(3) failed on child");
+            continue;
+        }
+        
         shmem->lineNo = i+3;
         printf("PID %d requesting line %d \n",getpid(), shmem->lineNo );
 
@@ -85,23 +89,31 @@ int main(int argc, char *argv[])
             continue;
         }
         printf("PID %d ,printing line %d from shared mem : %s \n",getpid(), shmem->lineNo , shmem->line);
+
+        if (sem_post(sem_clients)< 0 )
+        {
+            perror("sem_post(3) failed on child");
+            continue;
+        }
         
-        //sem_wait(sem_proc);
-        //sem_post(sem_try);
+        sleep(1);
         
     }
     
     //close semaphore
-    if (sem_close(sem_req) < 0)
+    if (sem_close(sem_req) < 0){
         perror("sem_close(3) failed");
-
-    if (sem_close(sem_proc) < 0)
+        exit(EXIT_FAILURE);
+    }
+    if (sem_close(sem_proc) < 0){
         perror("sem_close(3) failed");
+        exit(EXIT_FAILURE);
+    }
 
-    
-    if (sem_close(sem_try) < 0)
+    if (sem_close(sem_clients) < 0){
         perror("sem_close(3) failed");
-
+        exit(EXIT_FAILURE);
+    }
 
 
     /* Detach segment */

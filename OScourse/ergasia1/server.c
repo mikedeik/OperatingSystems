@@ -53,6 +53,8 @@ int main(int argc, char * argv[]){
 		printf("Just Attached Shared Memory \n");
 	}
 
+
+
     //init semaphores
 
     sem_t *sem_proc = sem_open(SEM_PROCESS, O_CREAT | O_EXCL, SEM_PERMS, INITIAL_VALUE);
@@ -60,13 +62,17 @@ int main(int argc, char * argv[]){
     sem_t *sem_clients = sem_open(SEM_CLIENTS, O_CREAT | O_EXCL, SEM_PERMS,1); // this is used only by the clients
     
 
-    if (sem_proc == SEM_FAILED || sem_req == SEM_FAILED) {
+    if (sem_proc == SEM_FAILED) {
         perror("sem_open(3) error");
         exit(EXIT_FAILURE);
     }
-    else
-    {
-        printf("both semaphores are open\n");
+    if(sem_req == SEM_FAILED){
+        perror("sem_open(3) error");
+        exit(EXIT_FAILURE);
+    }
+    if(sem_clients == SEM_FAILED){
+        perror("sem_open(3) error");
+        exit(EXIT_FAILURE);
     }
     
 
@@ -87,66 +93,65 @@ int main(int argc, char * argv[]){
 
     int status;
     int value;
-    int forkvalue = fork();
-    char sm[20];
-    char ln[20];
-    printf("this is forkvalue %d \n", forkvalue);
+    //int forkvalue = fork();
+    char sm[10]; // is this correct?
+    char ln[10];
+    size_t i;
+    pid_t pids[K];
+    
     sprintf(sm,"%d",mem_id);
     sprintf(ln,"%d",(linecount-1));
-    
-    if (forkvalue == 0)
-    {
-        printf("trying to execl\n");
-        (int) execl(CHILD_PROGRAM,CHILD_PROGRAM,sm,ln,argv[3],NULL);
-        //exit(1);
-    }
-    else
-    {
 
-        printf("this is parent process\n");
 
-        
-        
-        for (int  i = 0; i < N; i++)
+    for (i = 0; i <sizeof(pids)/sizeof(pids[0]) ; i++)
+    {
+        if ((pids[i] = fork()) < 0) {
+            perror("fork(2) failed");
+            exit(EXIT_FAILURE);
+        }
+        if (pids[i] == 0)
         {
-            //sleep(1);
-            sem_wait(sem_proc);
-
             
-            printf("parent replying to request for line: %d \n" , shmem->lineNo);
-
-
-            
-
-            linecount = 1;
-            rewind(fp); // this rewinds the file to the begining
-            while (fgets(shmem->line, sizeof(shmem->line) ,fp) != NULL)
-            {
-
-                if(linecount == shmem->lineNo)
-                {
-                    break;
-                    linecount++;
-                }
-                else
-                {
-                    linecount++;
-                }
-            }
-            
-
-            sem_post(sem_req); 
-             
+            printf("trying to execl\n");
+            (int) execl(CHILD_PROGRAM,CHILD_PROGRAM,sm,ln,argv[3],NULL);
+            //exit(1);
+        }
+        else
+        {        
+            printf("building child processes\n");
         }
         
-           
-
-        
-
-        wait(&status);
+    }       
+    for (int  j = 0; j < K*N; j++)
+    {
+        //sleep(1);
+        sem_wait(sem_proc);
+        printf("parent replying to request for line: %d \n" , shmem->lineNo);
+        linecount = 1;
+        rewind(fp); // this rewinds the file to the begining
+        while (fgets(shmem->line, sizeof(shmem->line) ,fp) != NULL)
+        {
+            if(linecount == shmem->lineNo)
+            {
+                break;
+                linecount++;
+            }
+            else
+            {
+                linecount++;
+            }
+        }
+        sem_post(sem_req); 
     }
 
+        
+    
 
+    for (i = 0; i < sizeof(pids)/sizeof(pids[0]); i++){
+        if (waitpid(pids[i], NULL, 0) < 0)
+            perror("waitpid(2) failed");
+
+    }
 
     fclose(fp);
 
@@ -158,6 +163,8 @@ int main(int argc, char * argv[]){
 
 
     if (sem_unlink(SEM_REQUEST) < 0) perror("sem_unlink(3) failed");
+
+    if (sem_unlink(SEM_CLIENTS) <0) perror("sem_unlink(3) failed");
 
     // detach memmory segment
 
