@@ -86,8 +86,8 @@ int main(int argc, char *argv[])
         }
         printf("PID %d ,printing line %d from shared mem : %s \n",getpid(), shmem->lineNo , shmem->line);
         
-        sem_wait(sem_proc);
-        sem_post(sem_try);
+        //sem_wait(sem_proc);
+        //sem_post(sem_try);
         
     }
     

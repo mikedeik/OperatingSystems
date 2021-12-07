@@ -23,8 +23,8 @@ int main(int argc, char * argv[]){
         printf("error input arguments");
         return -1;
     }
-    // agrv inputs
-    int K,N;
+    // agrument inputs
+    int K,N;            // K = number of child processes | N = number of iterations for each client
     K = atoi(argv[2]);    
     N = atoi(argv[3]);
     
@@ -43,14 +43,7 @@ int main(int argc, char * argv[]){
 		printf("Allocated Shared Memory with mem_ID: %d\n",(int)mem_id);
 	}
     
-    //unlink semaphores
-    if (sem_unlink(SEM_PROCESS) < 0) perror("sem_unlink(3) failed");
 
-
-    if (sem_unlink(SEM_REQUEST) < 0) perror("sem_unlink(3) failed");
-//
-    if (sem_unlink(SEM_TRY) < 0) perror("sem_unlink(3) failed");
-    //printf("this is the line string %s \n", line);
 
     // atach memory segment
     shmem = shmat(mem_id, NULL, 0);
@@ -62,11 +55,12 @@ int main(int argc, char * argv[]){
 
     //init semaphores
 
-    sem_t *semproc = sem_open(SEM_PROCESS, O_CREAT | O_EXCL, SEM_PERMS, INITIAL_VALUE);
-    sem_t *semreq = sem_open(SEM_REQUEST, O_CREAT | O_EXCL, SEM_PERMS, INITIAL_VALUE);
-    sem_t *semtry = sem_open(SEM_TRY , O_CREAT | O_EXCL, SEM_PERMS, INITIAL_VALUE);
+    sem_t *sem_proc = sem_open(SEM_PROCESS, O_CREAT | O_EXCL, SEM_PERMS, INITIAL_VALUE);
+    sem_t *sem_req = sem_open(SEM_REQUEST, O_CREAT | O_EXCL, SEM_PERMS, INITIAL_VALUE);
+    sem_t *sem_clients = sem_open(SEM_CLIENTS, O_CREAT | O_EXCL, SEM_PERMS,1); // this is used only by the clients
+    
 
-    if (semproc == SEM_FAILED || semreq == SEM_FAILED) {
+    if (sem_proc == SEM_FAILED || sem_req == SEM_FAILED) {
         perror("sem_open(3) error");
         exit(EXIT_FAILURE);
     }
@@ -111,14 +105,14 @@ int main(int argc, char * argv[]){
 
         printf("this is parent process\n");
 
-        //sem_wait(semtry);
+        
         
         for (int  i = 0; i < N; i++)
         {
             //sleep(1);
-            sem_wait(semproc);
+            sem_wait(sem_proc);
 
-            //sem_wait(semreq);
+            
             printf("parent replying to request for line: %d \n" , shmem->lineNo);
 
 
@@ -131,27 +125,17 @@ int main(int argc, char * argv[]){
 
                 if(linecount == shmem->lineNo)
                 {
-                    printf("correct line count \n");
                     break;
                     linecount++;
                 }
                 else
                 {
-                    printf("add 1 line \n");
                     linecount++;
                 }
             }
             
 
-            sem_post(semreq);
-            sem_post(semproc);
-
-            
-            
-            
-            
-            
-            sem_wait(semtry);
+            sem_post(sem_req); 
              
         }
         
@@ -162,11 +146,6 @@ int main(int argc, char * argv[]){
         wait(&status);
     }
 
-
-    
-    
-
-    //printf("there are %d lines \n" , linecount-1);
 
 
     fclose(fp);
@@ -179,8 +158,6 @@ int main(int argc, char * argv[]){
 
 
     if (sem_unlink(SEM_REQUEST) < 0) perror("sem_unlink(3) failed");
-
-    if (sem_unlink(SEM_TRY) < 0) perror("sem_unlink(3) failed");
 
     // detach memmory segment
 
