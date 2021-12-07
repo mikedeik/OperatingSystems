@@ -27,6 +27,8 @@ int main(int argc, char * argv[]){
     int K,N;            // K = number of child processes | N = number of iterations for each client
     K = atoi(argv[2]);    
     N = atoi(argv[3]);
+
+    
     
     // shared mem handlers
     int mem_id = 0, err = 0;
@@ -76,10 +78,6 @@ int main(int argc, char * argv[]){
     }
     
 
-
-
-    
-    
     // file handling
     int linecount = 1;
     FILE *fp;
@@ -89,7 +87,11 @@ int main(int argc, char * argv[]){
     while (fgets((shmem->line), sizeof (shmem->line) ,fp) != NULL){
         printf(" this is line %d : %s \n" , linecount,shmem->line);
         linecount++;
-    }
+    } 
+
+    
+    
+
 
     int status;
     int value;

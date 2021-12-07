@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <time.h>
 #include <fcntl.h>
 #include <semaphore.h>
 #include "defines.h"
@@ -20,13 +21,17 @@ int main(int argc, char *argv[])
         return -1;
     }
     
-    int mem_id,err,lineNo,requests;
+    int mem_id,err,totallines,requests;
     shared_mem *shmem;
 
     mem_id = atoi(argv[1]);
-    lineNo = atoi(argv[2]);
+    totallines = atoi(argv[2]);
     requests = atoi(argv[3]);
+    
+    
+    srand(getpid());
 
+    
 
   
     printf(">> The Shared Segment Id is: %d\n", mem_id);
@@ -60,10 +65,12 @@ int main(int argc, char *argv[])
     }
 
 
-
+    clock_t t;
+    long double result = 0.0;
 
     for (int i = 0; i < requests; i++)
     {
+        int random = rand();
 
 
         if (sem_wait(sem_clients)< 0 )
@@ -72,7 +79,7 @@ int main(int argc, char *argv[])
             continue;
         }
         
-        shmem->lineNo = i+3;
+        shmem->lineNo = (random % totallines + 1);
         printf("PID %d requesting line %d \n",getpid(), shmem->lineNo );
 
 
@@ -82,7 +89,7 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        
+        t = clock();
 
         if (sem_wait(sem_req) < 0) {
             perror("sem_wait(3) failed on child");
@@ -90,15 +97,19 @@ int main(int argc, char *argv[])
         }
         printf("PID %d ,printing line %d from shared mem : %s \n",getpid(), shmem->lineNo , shmem->line);
 
+        result += (double)((clock()-t)/CLOCKS_PER_SEC);
         if (sem_post(sem_clients)< 0 )
         {
             perror("sem_post(3) failed on child");
             continue;
         }
         
-        sleep(1);
         
     }
+
+    long double medium = result/requests;
+
+    printf("PID %d has medium response time for a request  %Lf \n" ,getpid(), medium);
     
     //close semaphore
     if (sem_close(sem_req) < 0){
