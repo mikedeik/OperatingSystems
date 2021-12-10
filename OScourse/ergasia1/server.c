@@ -8,6 +8,7 @@
 #include <semaphore.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <time.h>
 #include "defines.h"
 
 
@@ -28,6 +29,15 @@ int main(int argc, char * argv[]){
     int K,N;            // K = number of child processes | N = number of iterations for each client
     K = atoi(argv[2]);    
     N = atoi(argv[3]);
+
+    if (sem_unlink(SEM_PROCESS) < 0) perror("sem_unlink(3) failed");
+
+
+    if (sem_unlink(SEM_REQUEST) < 0) perror("sem_unlink(3) failed");
+
+    if (sem_unlink(SEM_CLIENTS) <0) perror("sem_unlink(3) failed");
+
+    if (sem_unlink(SEM_DONE) <0) perror("sem_unlink(3) failed");
     
     
     // shared mem handlers
@@ -93,6 +103,7 @@ int main(int argc, char * argv[]){
     } 
 
     
+    printf("here\n");
     
 
 
@@ -122,24 +133,42 @@ int main(int argc, char * argv[]){
             (int) execl(CHILD_PROGRAM,CHILD_PROGRAM,sm,ln,argv[3],NULL);
 
             kill(pids[i],SIGKILL);
-            return -1;
+            return 1;
             //exit(1);
         }
-        else
-        {        
-            continue;
-        }
+        
         
     }   
-
-
-           
-    for (int  j = 0; j < K*N; j++)
+    struct timespec ts;
+    if (clock_gettime(CLOCK_REALTIME,&ts))
     {
-        sem_post(sem_clients); // Give a child access to semaphore for critical section
+        return -1;
+    }
+    
+    ts.tv_sec += 2;
+ 
+    while(1)
+    {
+        if (err != 0)
+        {
+            perror("child failed\n");
+        }
+        
+        printf("wait pid value is %d \n" , err );
+        
+        if(sem_post(sem_clients)<0){         // Give a child access to semaphore for critical section
+            perror("sem_post(3) clients failed on parrent");
+            continue;
+
+        } 
 
         /************************* PARENT-CHILD ACTION ***************************************/
-        sem_wait(sem_proc);
+
+        printf("waiting for request\n");
+        if(sem_timedwait(sem_proc,&ts)<0){
+            break;
+        }
+
         printf("parent replying to request for line: %d \n" , shmem->lineNo);
         linecount = 1;
         rewind(fp); // this rewinds the file to the begining
@@ -155,24 +184,27 @@ int main(int argc, char * argv[]){
                 linecount++;
             }
         }
-        sem_post(sem_req); 
-        
+
+        if(sem_post(sem_req)<0){
+            perror("sem_post(3) req failed on parent ");
+            continue;
+        } 
         /************************* PARENT-CHILD ACTION ***************************************/
 
-        sem_wait(sem_done);
+        if(sem_wait(sem_done)<0){
+            perror("sem_wait(3) done failed on parent");
+            continue;
+        }
     }
 
         
     
 
-    for (i = 0; i < sizeof(pids)/sizeof(pids[0]); i++){
-        if (waitpid(pids[i], NULL, 0) < 0)
-            perror("waitpid(2) failed");
-
-    }
-
+    
+//
     fclose(fp);
 
+    
     //getchar();
 
 
@@ -206,6 +238,9 @@ int main(int argc, char * argv[]){
     //else {
 	//	printf("Just Removed Shared Segment. %d\n", (int)(err));
 	//}
+
+
+    printf("returning  \n");
 
 
     return 0;

@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
 
     
 
-  
+    printf("pid %d created by parent %d \n" ,getpid(),getppid());
 
 
 	/* Attach the memory segment */
@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
 
         // entering critical section
         if (sem_wait(sem_clients) < 0) {
-           perror("sem_wait(3) failed on child");
+           perror("sem_wait(3) clients failed on child");
            continue;
         }
         
@@ -97,14 +97,14 @@ int main(int argc, char *argv[])
     /*********************************************************************/
         if (sem_post(sem_proc)<0)
         {
-            perror("sem_post(3) failed on child");
+            perror("sem_post(3) proc failed on child");
             continue;
         }
 
         t = clock();
 
         if (sem_wait(sem_req) < 0) {
-            perror("sem_wait(3) failed on child");
+            perror("sem_wait(3) req failed on child");
             continue;
         }
 
@@ -115,7 +115,11 @@ int main(int argc, char *argv[])
 
         printf("PID %d is done with request \n", getpid());
 
-        sem_post(sem_done);
+
+        if(sem_post(sem_done)<0){
+            perror("sem_post(3) done failed on child");
+            continue;
+        }
         
 
 
@@ -128,6 +132,8 @@ int main(int argc, char *argv[])
     double medium = result;
 
     printf("PID %d has medium response time for a request  %e \n" ,getpid(), medium);
+
+
     
     //close semaphore
     if (sem_close(sem_req) < 0){
@@ -155,11 +161,9 @@ int main(int argc, char *argv[])
 	if (err == -1) {
 		perror ("Detachment.");
 	}
-    //else {
-	//	printf(">> Detachment of Shared Segment %d\n", err);
-	//}
-
-  
-  return 0;
+    
+    printf("THE CLIENT %d IS DONE!!!\n" , getpid());
+    
+    return 0;
   
 }
