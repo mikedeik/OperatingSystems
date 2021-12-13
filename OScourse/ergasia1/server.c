@@ -13,9 +13,6 @@
 
 
 
-
-
-
 int main(int argc, char * argv[]){
 
 
@@ -27,8 +24,10 @@ int main(int argc, char * argv[]){
     }
     // agrument inputs
     int K,N;            // K = number of child processes | N = number of iterations for each client
+    
     K = atoi(argv[2]);    
     N = atoi(argv[3]);
+
 
         
     // shared mem handlers
@@ -45,7 +44,6 @@ int main(int argc, char * argv[]){
         exit(EXIT_FAILURE);
 	}
     
-    
 
 
     // atach memory segment
@@ -55,14 +53,6 @@ int main(int argc, char * argv[]){
         exit(EXIT_FAILURE);
 	}
     
-    if (sem_unlink(SEM_PROCESS) < 0) perror("sem_unlink(3) failed");
-
-
-    if (sem_unlink(SEM_REQUEST) < 0) perror("sem_unlink(3) failed");
-
-    if (sem_unlink(SEM_CLIENTS) <0) perror("sem_unlink(3) failed");
-
-    if (sem_unlink(SEM_DONE) <0) perror("sem_unlink(3) failed"); 
 
 
     //init semaphores
@@ -93,11 +83,15 @@ int main(int argc, char * argv[]){
     
 
     // file handling   and  counting the lines of the file // 
-    int linecount = 1;      
+    int linecount = 0;      
     FILE *fp;
     char* filename;
     filename = argv[1];   
     fp = fopen(filename, "r");
+    if (fp == NULL){
+        perror("Error reading file");   
+        exit(EXIT_FAILURE);
+    }
     while (fgets((shmem->line), sizeof (shmem->line) ,fp) != NULL){
         linecount++;
     }
@@ -116,7 +110,7 @@ int main(int argc, char * argv[]){
     pid_t pids[K]; // we will store the pids of K Children here 
     
     sprintf(sm,"%d",mem_id); // setting both values as char[] to be able to pass as arguments
-    sprintf(ln,"%d",(linecount-1));
+    sprintf(ln,"%d",linecount);
 
 
 
@@ -131,27 +125,29 @@ int main(int argc, char * argv[]){
         if (pids[i] == 0)
         {
             
-            (int) execl(CHILD_PROGRAM,CHILD_PROGRAM,sm,ln,argv[3],NULL); // we call execl so the child processes will run ./client
+            if ((int) execl(CHILD_PROGRAM,CHILD_PROGRAM,sm,ln,argv[3],NULL)<0){ // we call execl so the child processes will run ./client
+                
+                K--;
+                kill(pids[i],SIGKILL); // if execl fails we signal-kill the child process wich will exit with value 1
+                exit(EXIT_FAILURE);
 
-            kill(pids[i],SIGKILL);                                      // if execl fails we signal-kill the child process wich will exit with value 1
-            exit(EXIT_FAILURE);
+            }
         }
         
         
     }   
-    struct timespec ts;                    // this part is used for sem_timedwait() 
-    if (clock_gettime(CLOCK_REALTIME,&ts)<0)
-    {
-        exit(EXIT_FAILURE);
-    }
+    // struct timespec ts;                          // this part is used for sem_timedwait() 
+    // if (clock_gettime(CLOCK_REALTIME,&ts)<0)
+    // {
+    //     exit(EXIT_FAILURE);
+    // }
     
-    ts.tv_sec += 60;                        // we init to 5 secs 
+    // ts.tv_sec += 2;                        // we init to 2 secs 
     
 
     /******************** THIS IS THE TRANSACTION PART *******************************/
-    int counter = 0;
 
-    while(1)        // keep getting requests                  
+    for(int i = 0; i< K*N; i++ )//while(1)        // keep getting requests                  
     {
         
         
@@ -164,9 +160,9 @@ int main(int argc, char * argv[]){
         /************************* PARENT-CHILD ACTION IN CRITICAL SECTION ***************************************/
 
         printf("Parent waiting for request \n");
-        if(sem_timedwait(sem_proc,&ts)<0){          // timed wait here for 5 secs. if no child is active this will break the loop and terminate the server program
-            printf("All requests are done \n");     // if children are active they will post the semaphore after sending the request 
-            break;
+        if(sem_wait(sem_proc)<0){                               // timed wait here for 5 secs. if no child is active this will break the loop and terminate the server program
+            perror("sem_wait(3) proc failed on parrent");     // if children are active they will post the semaphore after sending the request 
+            continue;
         }
 
         printf("parent replying to request for line: %d \n" , shmem->lineNo);
@@ -196,20 +192,21 @@ int main(int argc, char * argv[]){
             perror("sem_wait(3) done failed on parent");
             continue;
         }
-        counter++;
     }
+
+    /****************************  TRANSACTION PART IS OVER  ********************************************/
+    
 
     // we wait the children processes to get their exit status
     
     for (i = 0; i < sizeof(pids)/sizeof(pids[0]); i++){
         if (waitpid(pids[i], NULL, 0) < 0)
             perror("waitpid(2) failed");
-
+            
     }
     
     fclose(fp);     // after we are done we close the file
 
-    printf("the counter is %d \n", counter);
 
 
 

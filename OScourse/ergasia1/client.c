@@ -14,12 +14,6 @@ int main(int argc, char *argv[])
 {   
 
 
-    //checking arguments
-    if (argc<4)
-    {
-        perror("error in arguments \n");
-        exit(EXIT_FAILURE);
-    }
     
     // we declare the variables we need
     int mem_id,err,totallines,requests;
@@ -70,8 +64,8 @@ int main(int argc, char *argv[])
     }
 
     // we need clock_t to check the time each request needs
-    clock_t t;
-    double result = 0.0;
+    clock_t t = clock();
+    //long double result = 0.0;
 
 
     // we loop every request
@@ -81,7 +75,8 @@ int main(int argc, char *argv[])
         int random = rand();
         
 
-        printf("child with pid %d waiting to enter cirtical section \n ", getpid());
+        printf("child with pid %d waiting to enter cirtical section \n", getpid());
+        t = clock();
 
         // waiting post from parent to enter critical section
         if (sem_wait(sem_clients) < 0) {
@@ -101,7 +96,7 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        t = clock();
+        
 
         if (sem_wait(sem_req) < 0) {        // waiting for parent to reply
             perror("sem_wait(3) req failed on child");
@@ -124,15 +119,15 @@ int main(int argc, char *argv[])
         
 
 
-        result += (double)((clock()-t)/CLOCKS_PER_SEC); 
-        
+        //result += (double)((clock()-t)/CLOCKS_PER_SEC); 
+        //printf("this is clock %.10ld and this is t %.10ld :" , clock(),t);
         
         
     }
 
-    double medium = result/requests; // getting the medium responce time
+    long double medium = (clock()-t)/(double)requests; // getting the medium responce time
 
-    printf("PID %d has medium response time for a request  %e \n" ,getpid(), medium);
+    printf("PID %d has medium response time for a request  %.12Lf \n" ,getpid(), medium);
 
 
     
