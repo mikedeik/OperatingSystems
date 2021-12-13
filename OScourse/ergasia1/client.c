@@ -120,14 +120,14 @@ int main(int argc, char *argv[])
 
 
         //result += (double)((clock()-t)/CLOCKS_PER_SEC); 
-        //printf("this is clock %.10ld and this is t %.10ld :" , clock(),t);
+        
         
         
     }
 
-    long double medium = (clock()-t)/(double)requests; // getting the medium responce time
+    long double medium = ((clock()-t)/CLOCKS_PER_SEC)/(long double)requests; // getting the medium responce time
 
-    printf("PID %d has medium response time for a request  %.12Lf \n" ,getpid(), medium);
+    printf("PID %d has medium response time for a request  %2.12Lf \n" ,getpid(), medium);
 
 
     
